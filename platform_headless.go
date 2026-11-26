@@ -3,23 +3,18 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"mmonitor/internal/config"
 )
 
-// runPlatform keeps the historical headless behavior on Linux, macOS and in
-// containers: start the application, wait for SIGINT/SIGTERM or a server error,
-// then shut down exactly once.
 func runPlatform() error {
-	cfg, err := loadConfig()
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
+	cfg := config.Load()
 
-	app, err := newApplication(cfg, defaultDatabasePath())
+	app, err := newApplication(cfg, config.DefaultDatabasePath())
 	if err != nil {
 		return err
 	}

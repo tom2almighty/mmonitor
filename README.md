@@ -1,245 +1,69 @@
-# Traffic Monitor
+# MMonitor
 
-`Traffic Monitor` 是一个独立运行的 Clash 流量监控服务。
+轻量级、单二进制部署的 **Mihomo 内核流量监控服务**，基于纯 Go（零 CGO + 内嵌 SQLite）与 Shadcn UI (`base-nova`)。
 
-它会定时读取 Clash 的 `/connections` 数据，把流量增量先聚合到内存，再按分钟桶批量写入 SQLite，并提供一个内置 Web 页面，用来查看设备、域名、IP、代理维度的流量统计和链路明细。
+![MMonitor Preview](docs/preview.png)
 
-<p align="center">
-  轻量、直接、适合单机和 OpenWrt 场景的 Clash / Mihomo 流量监控服务
-</p>
+## 功能亮点
 
-<p align="center">
-  <a href="https://github.com/zhf883680/clash-traffic-monitor/stargazers">
-    <img src="https://img.shields.io/github/stars/zhf883680/clash-traffic-monitor?style=flat-square&color=yellow" alt="Stars" />
-  </a>
-  <a href="https://hub.docker.com/r/zhf883680/clash-traffic-monitor">
-    <img src="https://img.shields.io/docker/pulls/zhf883680/clash-traffic-monitor?style=flat-square&color=2496ED&logo=docker" alt="Docker Pulls" />
-  </a>
-  <a href="https://hub.docker.com/r/zhf883680/clash-traffic-monitor">
-    <img src="https://img.shields.io/docker/v/zhf883680/clash-traffic-monitor?style=flat-square&label=Docker&color=2496ED" alt="Docker Version" />
-  </a>
-  <a href="https://hub.docker.com/r/zhf883680/clash-traffic-monitor">
-    <img src="https://img.shields.io/docker/image-size/zhf883680/clash-traffic-monitor/latest?style=flat-square&logo=docker" alt="Image Size" />
-  </a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Go-1.21-00ADD8?style=flat-square&logo=go" alt="Go 1.21" />
-  <img src="https://img.shields.io/badge/SQLite-embedded-003B57?style=flat-square&logo=sqlite" alt="SQLite embedded" />
-  <img src="https://img.shields.io/badge/OpenWrt-friendly-00B5E2?style=flat-square" alt="OpenWrt Friendly" />
-</p>
-
-<p align="center">
-  <a href="#页面预览">页面预览</a> ·
-  <a href="#功能特性">功能特性</a> ·
-  <a href="#项目现状">项目现状</a> ·
-  <a href="#快速开始">快速开始</a> ·
-  <a href="#常用配置">常用配置</a> ·
-  <a href="#项目定位">项目定位</a>
-</p>
-
-## 页面预览
-
-![Traffic Monitor 页面预览](./readmeImg/image.png)
-
-## 功能特性
-
-- 按域名、IP、节点、代理、规则等维度查看流量，方便快速定位异常流量来源。
-- 可以直观看到连接是否走代理，辅助你调整 Mihomo / Clash 规则。
-- 新增“规则”维度：直接复用 Mihomo 每个连接命中的 Clash 规则（如 `geosite:telegram`、`geoip:CN`），把裸 IP 归到规则分组下，避免只看到 `91.108.56.108` 这类难以识别的地址。
-- 支持按 1 分钟窗口检测异常大流量域名，并自动把选定策略组切换到预设节点。
-- 支持在大流量结束后按静默时间自动恢复到原始节点，并记录恢复结果。
-- 支持“细节 / 汇总”前端展示切换；汇总模式只读取按天预聚合的紧凑数据，不展示连接明细，适合大流量长时间部署。
-- 支持过滤直连流量：开启后命中 `DIRECT` 的连接不再计入统计，避免直连流量干扰代理与规则维度的观察。
-- 使用分钟级聚合落盘到 SQLite，磁盘占用更可控，查询也更直接。
-- 提供内置 Web 页面，无需额外部署前端服务或数据库。
-- 支持本地二进制直接运行，也支持 Docker 部署，适合单机和 OpenWrt 场景。
-- Windows 版本提供系统托盘与开机自动启动；Linux、macOS 与 Docker 保持无界面的服务形态。
-
-## 项目现状
-
-这个项目目前已经基本完成了我最初的目标：
-
-- 观察哪些域名的流量偏大
-- 判断流量是否走了代理，并据此调整规则,自动切换节点
-- 查看节点维度的流量
-- 查看 IP 维度的流量
-
-对我来说，它已经够用了。
-
-如果后续还有新的需求，更建议直接 fork 之后按自己的场景继续扩展；也可以结合下面这两个项目，再配合 AI 辅助开发，补上你真正需要的功能。
-
-参考项目：
-
-- [foru17/neko-master](https://github.com/foru17/neko-master)
-- [MetaCubeX/metacubexd](https://github.com/MetaCubeX/metacubexd)
+- **多后端监控**：同时接入本机 Windows 与局域网软路由等多个 Mihomo 实例，按单后端或全局汇总查看流量。
+- **Fake-IP 深度统计**：完整解析 `host`、`sniffHost`、`remoteDestination`、`dnsMode`、`process`，精确统计 Fake-IP 流量占比并标记未解析连接。
+- **单连接 WebSocket 实时采集**：每个后端仅维持 1 条 `WS /connections`（1 秒粒度，失败自动降级 HTTP 轮询），低占用、不断联。
+- **多维可视化分析**：支持进程 / 主机 / 代理 / 规则 / 设备 / DNS 模式多维图表（折线图/柱状图/环形图）与实时连接管理，内置中英文 i18n 与浅色/暗色主题。
+- **永久历史汇总 & 数据管理**：分钟级明细按保留天数自动清理，日级汇总永久保留；支持一键空间回收（`VACUUM`）与自定义日期清理。
+- **双形态运行**：Windows 无黑框系统托盘（`HKCU` 用户级开机自启，无需管理员权限）；Linux / OpenWrt / Docker 静态单文件后台服务。
 
 ## 快速开始
 
-### 本地运行
+### Windows 本地运行
 
-推荐直接从 [Releases](https://github.com/zhf883680/clash-traffic-monitor/releases/latest) 下载对应平台的二进制文件运行。
+下载或编译 `mmonitor-windows-amd64.exe` 直接双击运行：
 
-#### Windows
+- 默认监听 `127.0.0.1:8080`，数据保存在程序旁 `data/mmonitor.db`。
+- 右键托盘图标可打开面板、开关开机自启（无需管理员权限）或优雅退出。
+- 在页面左下角点击「添加后端」填写 Mihomo 地址与 Secret 即可开始统计。
 
-下载文件：`traffic-monitor-windows-amd64.exe`
-
-```powershell
-.\traffic-monitor-windows-amd64.exe
-```
-
-Windows 版本是托盘程序：双击后没有控制台窗口，只在通知区域出现一个图标，右键托盘图标可以使用：
-
-- `打开统计页`：用默认浏览器打开实际监听地址对应的页面。
-- `开机自动启动`：写入当前用户的注册表 `HKCU\...\Run`，不需要管理员权限；程序移动位置后需要重新勾选一次。
-- `退出`：停止采集、把内存中的聚合数据落盘后退出。
-
-Windows 使用约定：
-
-- 数据库和日志固定放在 exe 旁边的 `data` 目录（`traffic_monitor.db`、`traffic-monitor.log`，日志按 5 MiB 轮转并保留一份备份），与启动时的工作目录无关。旧版本放在工作目录下的数据库会在首次运行时自动迁移到新位置，旧文件保留作备份。
-- 同一个登录会话内只运行一个实例；重复双击不会报端口错误，只会打开已运行实例的统计页。
-- 通过托盘退出会完成刷盘；用任务管理器强制结束仍可能丢失最近最多 10 分钟未刷盘的数据。
-
-#### Linux
-
-下载文件：
-
-- `traffic-monitor-linux-amd64`
-- `traffic-monitor-linux-arm64`
+### Docker / 软路由部署
 
 ```bash
-chmod +x ./traffic-monitor-linux-amd64
-./traffic-monitor-linux-amd64
+cp .env.example .env
+docker compose up -d
 ```
+
+OpenWrt / ARM64 软路由直接运行静态单文件：
 
 ```bash
-chmod +x ./traffic-monitor-linux-arm64
-./traffic-monitor-linux-arm64
+chmod +x ./mmonitor-linux-arm64
+MIHOMO_URL=http://127.0.0.1:9090 ./mmonitor-linux-arm64
 ```
 
-#### macOS
-
-下载文件：`traffic-monitor-macos-arm64`
+### 本地源码编译
 
 ```bash
-chmod +x ./traffic-monitor-macos-arm64
-./traffic-monitor-macos-arm64
+# 1. 构建前端（输出至 web/dist）
+cd web && pnpm install && pnpm build
+
+# 2. 编译二进制（零 CGO）
+cd ..
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H=windowsgui" -o mmonitor.exe .
+CGO_ENABLED=0 GOOS=linux   GOARCH=arm64 go build -ldflags="-s -w" -o mmonitor-linux-arm64 .
 ```
 
-如果你是从源码本地编译，也可以直接这样运行：
+## 常用环境变量
 
-```bash
-go build -o traffic-monitor .
-./traffic-monitor
-```
+| 变量名                    | 默认值                                                     | 说明                                      |
+| ------------------------- | ---------------------------------------------------------- | ----------------------------------------- |
+| `MIHOMO_URL`              | 空                                                         | 可选，启动时自动添加/同步默认 Mihomo 后端 |
+| `MIHOMO_SECRET`           | 空                                                         | 可选，默认后端的 Bearer Token             |
+| `MMONITOR_LISTEN`         | Win: `127.0.0.1:8080`；其他: `:8080`                       | HTTP 监听地址                             |
+| `MMONITOR_DB`             | Win: `<exe>/data/mmonitor.db`；Docker: `/data/mmonitor.db` | SQLite 数据库路径                         |
+| `MMONITOR_RETENTION_DAYS` | `30`                                                       | 分钟级明细保留天数（日级汇总永久保留）    |
+| `MMONITOR_ALLOWED_ORIGIN` | 空（仅同源）                                               | 可选 CORS 允许源                          |
 
-启动后访问：
+## 发布
 
-```text
-http://localhost:8080/
-```
+推送 `vX.Y.Z` 标签触发 GitHub Actions 自动构建全平台静态二进制与多架构 Docker 镜像（GHCR）。
 
-如果本地还没有保存过 Mihomo 配置，首次打开页面会提示填写：
+## License
 
-- `Mihomo URL`
-- `Secret`（如果 Mihomo 没有设置密钥，可以留空）
-
-保存后会立即生效，并持久化到本地 SQLite。后续也可以在页面右上角继续修改这两个值。
-
-页面右上角「设置」里还可以调整：
-
-- `域名分组`：把子域名归并到主域名展示。
-- `过滤 DIRECT 直连流量`：开启后链路上出现 `DIRECT` 的连接不再写入统计，趋势、总量和各维度都不再包含直连流量，历史数据不受影响。
-- `日志保留天数`：本地聚合数据的保留时长。
-
-### Docker 运行
-
-```bash
-mkdir -p data
-
-docker run -d \
-  --name traffic-monitor \
-  --restart unless-stopped \
-  -p 8080:8080 \
-  -e MIHOMO_URL=http://host.docker.internal:9090 \
-  -e MIHOMO_SECRET=your-secret \
-  -v "$(pwd)/data:/data" \
-  zhf883680/clash-traffic-monitor:latest
-```
-
-如果 Mihomo 没有设置密钥，可以把 `MIHOMO_SECRET` 留空。
-
-升级兼容说明：
-
-- 旧版 Docker 用户升级后，如果启动参数里仍然传了 `MIHOMO_URL` / `MIHOMO_SECRET`，新版本会继续直接使用这些值，不会影响启动。
-- 启动时只要环境变量里有值，就会以环境变量为准，并自动保存到数据库。
-- 如果后续移除了环境变量，但保留了 `/data` 挂载目录，服务会回退使用数据库里上次保存的值。
-
-## 常用配置
-
-| 变量名 | 默认值 | 说明 |
-| --- | --- | --- |
-| `MIHOMO_URL` | 空 | 启动时优先使用的 Mihomo Controller 地址；未设置时可在页面首次打开后填写 |
-| `MIHOMO_SECRET` | 空 | Mihomo Bearer Token |
-| `TRAFFIC_MONITOR_LISTEN` | `:8080` | 服务监听地址 |
-
-## 自动切换
-
-页面内新增了“自动切换”配置区，用来处理“某个域名通过某个策略组时，在 1 分钟内流量突然特别大”的场景。
-
-- 触发条件不是“任意域名一超阈值就全局触发”，而是“某个域名命中的策略组，在 1 分钟窗口内累计流量超过阈值”。
-- 只有当这次流量实际命中的策略组，也在自动切换配置里启用时，才会触发切换。
-- 触发后会先切换这次命中的策略组；如果它的目标本身也是一个已启用的策略组，则会继续递归切换，直到目标不是已启用策略组为止。
-- 如果递归过程中遇到的目标是一个策略组，但这个组没有在自动切换里启用，则会停在这个组上，并将本次切换视为成功。
-- 不需要维护域名列表，也不会修改你原有的 Mihomo 规则判断逻辑。
-- 只展示并控制 Mihomo 的 `select` 和 `fallback` 策略组。
-- 你可以勾选多个策略组，并为每个策略组单独指定一个目标节点。
-- 支持配置冷却时间，避免频繁重复切换。
-- 可选开启“自动恢复原节点”。
-  - 每次成功自动切换时，会记录当时该策略组原本选中的节点。
-  - 如果后续持续一段“静默恢复时间”都没有新的大流量触发，就会尝试恢复到最初记录的原节点。
-  - 静默恢复时间按分钟桶计算，新的大流量触发会刷新等待时间。
-  - 如果你在 Mihomo 里手动把策略组改到别的节点，待恢复任务会自动取消，避免覆盖人工操作。
-  - 如果原始节点已经不在当前策略组选项里，系统会记录一次恢复失败事件，并清理对应恢复任务。
-
-## 存储策略
-
-- 只把分钟级聚合数据写入 `traffic_aggregated`，不再持久化逐条原始连接日志。
-- 聚合数据固定保留 30 天。
-- 本地直接运行时（Linux/macOS），默认数据库文件是 `./data/traffic_monitor.db`；Windows 下固定为 exe 旁边的 `data\traffic_monitor.db`。
-- Docker 容器内运行时，默认数据库文件是 `/data/traffic_monitor.db`。
-- 采集增量先进入内存缓冲，每 10 分钟批量刷盘一次。
-- 正常运行时，页面查询会把已落盘聚合数据和当前内存缓冲一起合并，所以最近几分钟也能查到。
-- 如果服务异常退出，最近最多 10 分钟、尚未刷盘的数据可能丢失。
-- 后台会持续把已完成的天级聚合写入 `traffic_summary`，只保留设备、主机、代理及二级维度，不包含连接明细。
-- `traffic_summary` 的保留天数为“日志保留天数” × 4；数据库清理时会同步执行 WAL checkpoint，避免 WAL 文件长期膨胀。除每小时清理外，运行期每 5 分钟还会做一次轻量 WAL checkpoint，把高流量场景下 WAL 文件的峰值控制在较小范围。
-- 原始连接日志表只保留写入负担最小的索引，并且每小时清空；页面查询全部走分钟聚合表，原始日志量不会拖慢页面。
-- 聚合表的时间范围查询强制走 bucket 索引，查询耗时只跟所选时间范围有关，不会随表总行数（日志量）线性膨胀。
-- 升级后首次清理会自动执行一次 WAL checkpoint 和 VACUUM，用于回收旧版本遗留的主库与 WAL 空间。
-
-## 项目定位
-
-如果你已经看过 [foru17/neko-master](https://github.com/foru17/neko-master)，那你看到的是一个先做出来、而且已经非常完善的产品。它的定位更完整，覆盖了更丰富的网络流量可视化和部署能力。
-
-这个项目没有打算和它做“功能越多越好”的正面竞争，而是走另一条路线：更轻、更直给、更适合单机或 OpenWrt 场景。
-
-- 更轻量：Go 单二进制 + SQLite，本地就能跑起来，不需要额外的 Node.js 运行时或独立数据库。
-- 更省心：前端资源直接内嵌在程序里，部署时就是一个服务或一个容器，升级和迁移都更简单。
-- 更聚焦：核心目标就是盯住  Clash 的 `/connections` 流量，把设备、主机、出口节点和明细钻取做好。
-- 更适合小设备：更贴近旁路由、软路由、OpenWrt 这类“资源有限但想快速看流量”的使用场景。
-- 更容易二次定制：代码结构短、依赖少，想自己加维度、调样式、改展示逻辑会更直接。
-- 更省磁盘 IO：运行时只持久化 30 天分钟级聚合数据，最近最多 10 分钟保存在内存缓冲里统一刷盘。
-
-## 备注
-
-因为这个项目主要监控运行在 OpenWrt 路由器环境的 Clash，当前默认移除了进程维度相关展示。
-
-如果你需要进程模块，可以在此基础上自行 fork 后补充。
-
-## 致谢
-
-- 页面接口参考了 [MetaCubeX/metacubexd](https://github.com/MetaCubeX/metacubexd)。
-- [LinuxDO](https://linux.do) - the community where it all began
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=zhf883680/clash-traffic-monitor&type=Date)](https://star-history.com/#zhf883680/clash-traffic-monitor&Date)
+[AGPL-3.0](LICENSE)

@@ -1,264 +1,151 @@
-name: Traffic Monitor Release
+name: Release
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
 
 permissions:
   contents: write
   packages: write
 
-env:
-  APP_DIR: .
-  IMAGE_NAME: zhf883680/clash-traffic-monitor
-
 jobs:
-  test-linux:
+  build-web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: pnpm/action-setup@v4
         with:
-          go-version: '1.21'
-          cache: true
-          cache-dependency-path: go.sum
+          version: 10
 
-      - name: Install C compiler
-        run: sudo apt-get update && sudo apt-get install -y gcc
-
-      - name: Test
-        env:
-          CGO_ENABLED: "1"
-        run: |
-          go test ./...
-          go vet ./...
-
-  test-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-node@v4
         with:
-          go-version: '1.21'
-          cache: true
-          cache-dependency-path: go.sum
+          node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: web/pnpm-lock.yaml
 
-      - name: Use preinstalled mingw toolchain
-        shell: pwsh
+      - name: Install and build web
+        working-directory: web
         run: |
-          if (-not (Test-Path 'C:\mingw64\bin\gcc.exe')) { throw 'preinstalled mingw64 toolchain not found' }
-          Add-Content $env:GITHUB_PATH 'C:\mingw64\bin'
-          gcc --version
+          pnpm install --frozen-lockfile
+          pnpm typecheck
+          pnpm build
 
-      - name: Test
-        env:
-          CGO_ENABLED: "1"
-          CC: gcc
-        run: go test ./...
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
 
-  build-and-upload:
-    needs: [test-linux, test-windows]
+  build-binaries:
+    needs: build-web
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - target: binary
-            goos: linux
+          - goos: windows
             goarch: amd64
-            cc: gcc
-            ext: ""
-            ldflags: "-s -w"
-          - target: binary
-            goos: linux
-            goarch: arm64
-            cc: aarch64-linux-gnu-gcc
-            ext: ""
-            ldflags: "-s -w"
-          - target: binary
-            goos: windows
-            goarch: amd64
-            cc: x86_64-w64-mingw32-gcc
             ext: ".exe"
-            ldflags: "-s -w -H=windowsgui"
-          - target: docker
-            platform: linux/amd64
-          - target: docker
-            platform: linux/arm64
+            extra_ldflags: "-H=windowsgui"
+          - goos: linux
+            goarch: amd64
+            ext: ""
+            extra_ldflags: ""
+          - goos: linux
+            goarch: arm64
+            ext: ""
+            extra_ldflags: ""
+          - goos: darwin
+            goarch: arm64
+            ext: ""
+            extra_ldflags: ""
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from tag
-        id: version
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION=manual-${GITHUB_RUN_NUMBER}
-          fi
-          VERSION=${VERSION#v}
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Set up QEMU
-        if: matrix.target == 'docker'
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        if: matrix.target == 'docker'
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        if: matrix.target == 'docker'
-        uses: docker/login-action@v3
+      - uses: actions/download-artifact@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          name: web-dist
+          path: web/dist
 
-      - name: Build and push Docker image
-        if: matrix.target == 'docker' && matrix.platform == 'linux/amd64'
-        uses: docker/build-push-action@v6
+      - uses: actions/setup-go@v5
         with:
-          context: ${{ env.APP_DIR }}
-          file: ${{ env.APP_DIR }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            ${{ env.IMAGE_NAME }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Set up Go
-        if: matrix.target == 'binary'
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
+          go-version: "1.24"
           cache: true
-          cache-dependency-path: go.sum
-
-      - name: Install cross-compilers
-        if: matrix.target == 'binary'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-mingw-w64-x86-64
 
       - name: Build binary
-        if: matrix.target == 'binary'
-        working-directory: ${{ env.APP_DIR }}
         env:
-          CGO_ENABLED: "1"
+          CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CC: ${{ matrix.cc }}
         run: |
-          VERSION=${{ steps.version.outputs.version }}
-          OUTPUT_NAME=traffic-monitor-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
-          echo "Building $OUTPUT_NAME version $VERSION"
-          go build -ldflags="${{ matrix.ldflags }}" -o "./$OUTPUT_NAME" .
-          chmod +x "./$OUTPUT_NAME" || true
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "${GITHUB_REF}" != refs/tags/* ]]; then
+            VERSION="dev-${GITHUB_RUN_NUMBER}"
+          fi
+          OUT="mmonitor-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}"
+          go build \
+            -ldflags="-s -w ${{ matrix.extra_ldflags }} -X mmonitor/internal/config.AppVersion=${VERSION}" \
+            -o "./dist/${OUT}" .
 
-      - name: Verify Windows GUI subsystem
-        if: matrix.target == 'binary' && matrix.goos == 'windows'
-        run: |
-          x86_64-w64-mingw32-objdump -p ./traffic-monitor-windows-amd64.exe | grep -q "Subsystem.*Windows GUI" || {
-            echo "windows binary is not a GUI subsystem binary"
-            exit 1
-          }
-
-      - name: Upload to Release
-        if: matrix.target == 'binary'
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          files: traffic-monitor-*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: binary-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/mmonitor-*
 
-  build-musl-arm64:
-    needs: [test-linux, test-windows]
+  publish-release:
+    needs: build-binaries
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          merge-multiple: true
+          path: release-assets
 
-      - name: Extract version from tag
-        id: version
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION=manual-${GITHUB_RUN_NUMBER}
-          fi
-          VERSION=${VERSION#v}
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Generate checksums
+        working-directory: release-assets
+        run: sha256sum mmonitor-* > SHA256SUMS.txt
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Build musl arm64 binary via Alpine container
-        run: |
-          docker run --rm \
-            -v "$(pwd):/app" -w /app \
-            --platform linux/arm64 \
-            golang:1.21-alpine \
-            sh -c "apk add --no-cache gcc musl-dev && \
-                   CGO_ENABLED=1 go build -ldflags='-s -w' -o traffic-monitor-linux-arm64-musl ."
-
-      - name: Upload to Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: traffic-monitor-linux-arm64-musl
+          generate_release_notes: true
+          files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-macos-arm64:
-    needs: [test-linux, test-windows]
-    runs-on: macos-latest
-
+  build-docker:
+    needs: build-web
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from tag
-        id: version
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION=manual-${GITHUB_RUN_NUMBER}
-          fi
-          VERSION=${VERSION#v}
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          go-version: '1.21'
-          cache: true
-          cache-dependency-path: go.sum
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build macOS arm64 binary
-        working-directory: ${{ env.APP_DIR }}
-        env:
-          CGO_ENABLED: "1"
-          GOOS: darwin
-          GOARCH: arm64
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          OUTPUT_NAME=traffic-monitor-macos-arm64
-          echo "Building $OUTPUT_NAME version $VERSION"
-          go build -ldflags="-s -w" -o "./$OUTPUT_NAME" .
-          chmod +x "./$OUTPUT_NAME"
-
-      - name: Upload macOS binary to Release
-        uses: softprops/action-gh-release@v2
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
         with:
-          files: traffic-monitor-macos-arm64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            APP_VERSION=${{ github.ref_name }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
