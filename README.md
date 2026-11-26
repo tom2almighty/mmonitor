@@ -1,6 +1,6 @@
 # MMonitor
 
-轻量级、单二进制部署的 **Mihomo 内核流量监控服务**，基于纯 Go（零 CGO + 内嵌 SQLite）与 Shadcn UI (`base-nova`)。
+基于 [clash-traffic-monitor](https://github.com/zhf883680/clash-traffic-monitor) 重写的轻量级 Mihomo 流量监控服务，支持单二进制文件部署。
 
 ![MMonitor Preview](docs/preview.png)
 
