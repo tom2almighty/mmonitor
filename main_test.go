@@ -69,9 +69,10 @@ func TestFakeIPResolutionAndMetadataAttribution(t *testing.T) {
 			Network:       "udp",
 			DestinationIP: "198.18.1.9",
 			SniffHost:     "api.openai.com",
+			ProcessPath:   "/Applications/Safari.app/Contents/MacOS/Safari",
 		},
 	})
-	if c2.DNSMode != mihomo.DNSModeFakeIP || c2.Host != "api.openai.com" {
+	if c2.DNSMode != mihomo.DNSModeFakeIP || c2.Host != "api.openai.com" || c2.Process != "Safari" {
 		t.Fatalf("unexpected resolved c2: %+v", c2)
 	}
 

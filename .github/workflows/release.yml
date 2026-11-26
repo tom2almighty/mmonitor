@@ -49,12 +49,20 @@ jobs:
             goarch: amd64
             ext: ".exe"
             extra_ldflags: "-H=windowsgui"
+          - goos: windows
+            goarch: arm64
+            ext: ".exe"
+            extra_ldflags: "-H=windowsgui"
           - goos: linux
             goarch: amd64
             ext: ""
             extra_ldflags: ""
           - goos: linux
             goarch: arm64
+            ext: ""
+            extra_ldflags: ""
+          - goos: darwin
+            goarch: amd64
             ext: ""
             extra_ldflags: ""
           - goos: darwin

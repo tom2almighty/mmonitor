@@ -2,7 +2,6 @@ package mihomo
 
 import (
 	"net"
-	"path/filepath"
 	"strings"
 )
 
@@ -212,7 +211,7 @@ func (d *FakeIPDetector) ResolveConnection(conn Connection) ResolvedConnection {
 
 	process := strings.TrimSpace(meta.Process)
 	if process == "" && strings.TrimSpace(meta.ProcessPath) != "" {
-		process = filepath.Base(strings.TrimSpace(meta.ProcessPath))
+		process = processBaseName(meta.ProcessPath)
 	}
 	if process == "" {
 		process = "Unknown"
@@ -308,6 +307,17 @@ func NormalizeProxyGroupType(raw string) string {
 	default:
 		return ""
 	}
+}
+
+func processBaseName(raw string) string {
+	trimmed := strings.TrimRight(strings.TrimSpace(raw), `/\`)
+	if trimmed == "" {
+		return ""
+	}
+	if idx := strings.LastIndexAny(trimmed, `/\`); idx >= 0 {
+		return trimmed[idx+1:]
+	}
+	return trimmed
 }
 
 func defaultString(value, fallback string) string {
