@@ -5,8 +5,6 @@ import { useTranslation } from "react-i18next"
 import {
   Activity,
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   BarChart3,
   Check,
   ChevronsUpDown,
@@ -142,30 +140,46 @@ export function AppShell({ children }: { children: ReactNode }) {
     void queryClient.invalidateQueries()
   }
 
+  const currentBackendLabel = activeBackend
+    ? activeBackend.name
+    : backends.length > 0
+      ? t("backends.allBackends")
+      : t("backends.noBackends")
+
   const backendSwitcherMenu = (isCompact: boolean) => (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          isCompact ? (
-            <button
-              type="button"
-              aria-label={t("backends.switchBackend")}
-              className="relative flex size-9 items-center justify-center rounded-lg border border-sidebar-border bg-background/70 text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          ) : (
-            <button
-              type="button"
-              className="flex w-full flex-col gap-1.5 rounded-lg border border-sidebar-border bg-background/70 p-2.5 text-left text-xs transition-colors hover:bg-sidebar-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          )
-        }
-      >
-        {isCompact ? (
-          <>
+      {isCompact ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label={t("backends.switchBackend")}
+                    className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                }
+              />
+            }
+          >
             <Server className="size-4" />
+          </TooltipTrigger>
+          <TooltipContent side="right">{currentBackendLabel}</TooltipContent>
+        </Tooltip>
+      ) : (
+        <DropdownMenuTrigger
+          render={
+            <button
+              type="button"
+              className="flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-sidebar-border bg-background/70 px-2.5 text-left text-xs transition-colors hover:bg-sidebar-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          }
+        >
+          <div className="flex min-w-0 items-center gap-2">
             <span
               className={cn(
-                "absolute top-1.5 right-1.5 size-2 rounded-full ring-2 ring-sidebar",
+                "size-2 shrink-0 rounded-full",
                 status?.connected
                   ? "bg-success"
                   : backends.length > 0
@@ -173,57 +187,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                     : "bg-warning",
               )}
             />
-          </>
-        ) : (
-          <>
-            <div className="flex w-full items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <span
-                  className={cn(
-                    "size-2 shrink-0 rounded-full",
-                    status?.connected
-                      ? "bg-success"
-                      : backends.length > 0
-                        ? "bg-destructive"
-                        : "bg-warning",
-                  )}
-                />
-                <span className="truncate font-medium">
-                  {activeBackend
-                    ? activeBackend.name
-                    : backends.length > 0
-                      ? t("backends.allBackends")
-                      : t("backends.noBackends")}
-                </span>
-              </div>
-              <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
-            </div>
+            <span className="truncate font-medium">{currentBackendLabel}</span>
+          </div>
+          <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
+        </DropdownMenuTrigger>
+      )}
 
-            {status?.connected ? (
-              <div className="grid w-full grid-cols-2 gap-1 font-mono text-[11px] tabular-nums">
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <ArrowUp className="size-3 text-chart-1" />
-                  <span className="truncate text-foreground">
-                    {formatSpeed(status.uploadSpeed)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <ArrowDown className="size-3 text-chart-2" />
-                  <span className="truncate text-foreground">
-                    {formatSpeed(status.downloadSpeed)}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="text-[11px] text-muted-foreground">
-                {backends.length > 0 ? t("status.offline") : t("backends.clickToAdd")}
-              </div>
-            )}
-          </>
-        )}
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent side="top" align="start" className="w-60">
+      <DropdownMenuContent side={isCompact ? "right" : "top"} align="start" className="w-60">
         {backends.length > 1 && (
           <DropdownMenuItem onClick={() => setBackendId(0)}>
             <Server className="size-3.5 text-muted-foreground" />
@@ -284,9 +254,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   )
 
   const footerQuickActions = (isCompact: boolean) => (
-    <div
-      className={cn("flex items-center", isCompact ? "flex-col gap-1.5" : "justify-between gap-1")}
-    >
+    <div className={cn("flex items-center gap-1", isCompact ? "flex-col" : "justify-start")}>
       {/* Refresh */}
       <Tooltip>
         <TooltipTrigger
@@ -296,7 +264,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               size="icon"
               className={cn(
                 "text-muted-foreground hover:text-foreground",
-                isCompact ? "size-9" : "h-8 flex-1",
+                isCompact ? "size-9" : "size-8",
               )}
               aria-label={t("common.refresh")}
               onClick={handleRefresh}
@@ -320,7 +288,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     size="icon"
                     className={cn(
                       "text-muted-foreground hover:text-foreground",
-                      isCompact ? "size-9" : "h-8 flex-1",
+                      isCompact ? "size-9" : "size-8",
                     )}
                     aria-label={t("language.label")}
                   />
@@ -332,7 +300,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </TooltipTrigger>
           <TooltipContent side={isCompact ? "right" : "top"}>{t("language.label")}</TooltipContent>
         </Tooltip>
-        <DropdownMenuContent side={isCompact ? "right" : "top"} align="center" className="w-32">
+        <DropdownMenuContent side={isCompact ? "right" : "top"} align="start" className="w-32">
           <DropdownMenuItem onClick={() => void i18n.changeLanguage("zh-CN")}>
             <span className="flex-1">{t("language.zhCN")}</span>
             {currentLang === "zh-CN" && <Check className="size-3.5" />}
@@ -356,7 +324,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     size="icon"
                     className={cn(
                       "text-muted-foreground hover:text-foreground",
-                      isCompact ? "size-9" : "h-8 flex-1",
+                      isCompact ? "size-9" : "size-8",
                     )}
                     aria-label={t("theme.label")}
                   />
@@ -374,7 +342,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </TooltipTrigger>
           <TooltipContent side={isCompact ? "right" : "top"}>{t("theme.label")}</TooltipContent>
         </Tooltip>
-        <DropdownMenuContent side={isCompact ? "right" : "top"} align="end" className="w-36">
+        <DropdownMenuContent side={isCompact ? "right" : "top"} align="start" className="w-36">
           <DropdownMenuItem onClick={() => setTheme("light")}>
             <Sun className="size-3.5" />
             <span className="flex-1">{t("theme.light")}</span>
