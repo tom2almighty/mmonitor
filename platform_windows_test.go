@@ -18,9 +18,9 @@ func TestDashboardURLFromAddr(t *testing.T) {
 		addr string
 		want string
 	}{
-		{"0.0.0.0:8080", "http://127.0.0.1:8080/"},
+		{"0.0.0.0:38080", "http://127.0.0.1:38080/"},
 		{"[::]:9090", "http://127.0.0.1:9090/"},
-		{"127.0.0.1:8080", "http://127.0.0.1:8080/"},
+		{"127.0.0.1:38080", "http://127.0.0.1:38080/"},
 	}
 	for _, tc := range cases {
 		tcpAddr, err := net.ResolveTCPAddr("tcp", tc.addr)
@@ -38,13 +38,13 @@ func TestDashboardURLFromAddr(t *testing.T) {
 }
 
 func TestValidateMetadataURL(t *testing.T) {
-	if err := validateMetadataURL("http://127.0.0.1:8080/"); err != nil {
+	if err := validateMetadataURL("http://127.0.0.1:38080/"); err != nil {
 		t.Fatalf("expected valid url, got %v", err)
 	}
 	for _, bad := range []string{
 		"file:///C:/Windows/calc.exe",
 		"javascript:alert(1)",
-		"http://127.0.0.1:8080/evil",
+		"http://127.0.0.1:38080/evil",
 		"http://127.0.0.1/",
 	} {
 		if err := validateMetadataURL(bad); err == nil {

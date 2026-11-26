@@ -19,7 +19,7 @@
 
 下载或编译 `mmonitor-windows-amd64.exe` 直接双击运行：
 
-- 默认监听 `127.0.0.1:8080`，数据保存在程序旁 `data/mmonitor.db`。
+- 默认监听 `127.0.0.1:38080`，数据保存在程序旁 `data/mmonitor.db`。
 - 右键托盘图标可打开面板、开关开机自启（无需管理员权限）或优雅退出。
 - 在页面左下角点击「添加后端」填写 Mihomo 地址与 Secret 即可开始统计。
 
@@ -55,7 +55,7 @@ CGO_ENABLED=0 GOOS=linux   GOARCH=arm64 go build -ldflags="-s -w" -o mmonitor-li
 | ------------------------- | ---------------------------------------------------------- | ----------------------------------------- |
 | `MIHOMO_URL`              | 空                                                         | 可选，启动时自动添加/同步默认 Mihomo 后端 |
 | `MIHOMO_SECRET`           | 空                                                         | 可选，默认后端的 Bearer Token             |
-| `MMONITOR_LISTEN`         | Win: `127.0.0.1:8080`；其他: `:8080`                       | HTTP 监听地址                             |
+| `MMONITOR_LISTEN`         | Win: `127.0.0.1:38080`；其他: `:8080`                      | HTTP 监听地址                             |
 | `MMONITOR_DB`             | Win: `<exe>/data/mmonitor.db`；Docker: `/data/mmonitor.db` | SQLite 数据库路径                         |
 | `MMONITOR_RETENTION_DAYS` | `30`                                                       | 分钟级明细保留天数（日级汇总永久保留）    |
 | `MMONITOR_ALLOWED_ORIGIN` | 空（仅同源）                                               | 可选 CORS 允许源                          |

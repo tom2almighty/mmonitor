@@ -39,11 +39,12 @@ type Config struct {
 	AllowedOrigin string
 }
 
-// DefaultListenAddr returns loopback on Windows desktop (safer by default) and
-// wildcard on Linux/macOS/Docker so LAN clients can reach router deployments.
+// DefaultListenAddr returns a high loopback port on Windows desktop (safer by
+// default and avoids clashing with common local dev servers on 8080) and
+// wildcard :8080 on Linux/macOS/Docker so LAN clients can reach router deployments.
 func DefaultListenAddr() string {
 	if runtime.GOOS == "windows" && !IsContainerRuntime() {
-		return "127.0.0.1:8080"
+		return "127.0.0.1:38080"
 	}
 	return ":8080"
 }

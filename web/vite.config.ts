@@ -6,6 +6,9 @@ import { defineConfig, type Plugin } from "vite"
 
 const logoSvgPath = path.resolve(__dirname, "../assets/logo.svg")
 const distGitkeepPath = path.resolve(__dirname, "./dist/.gitkeep")
+const apiTarget =
+  process.env.VITE_API_TARGET ||
+  (process.platform === "win32" ? "http://127.0.0.1:38080" : "http://127.0.0.1:8080")
 
 function mmonitorAssetsPlugin(): Plugin {
   return {
@@ -46,15 +49,15 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8080",
+        target: apiTarget,
         changeOrigin: true,
       },
       "/health": {
-        target: "http://127.0.0.1:8080",
+        target: apiTarget,
         changeOrigin: true,
       },
       "/LICENSE": {
-        target: "http://127.0.0.1:8080",
+        target: apiTarget,
         changeOrigin: true,
       },
     },
